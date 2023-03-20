@@ -1,0 +1,7 @@
+---
+- name: this will not be counted as a failure
+  hosts: localhost
+  tasks:
+    - name: this will not be counted as a failure
+      command: /bin/false
+      ignore_errors: no

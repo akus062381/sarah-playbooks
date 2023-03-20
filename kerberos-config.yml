@@ -1,0 +1,69 @@
+---
+- name: Config kerberos for Red Hat login
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Download legacy.crt
+      ansible.builtin.uri: 
+          creates: "{{item}}/legacy.crt"
+          dest: "{{item}}/legacy.crt"
+          url: https://password.corp.redhat.com/legacy.crt
+      loop:
+          - /etc/openldap/cacerts
+          - /etc/pki/ca-trust/source/anchors
+    - name: Download RH-IT-Root-CA.crt
+      ansible.builtin.uri: 
+          creates: "{{item}}/RH-IT-Root-CA.crt"
+          dest: "{{item}}/RH-IT-Root-CA.crt"
+          url: https://password.corp.redhat.com/RH-IT-Root-CA.crt
+      loop:
+          - /etc/openldap/cacerts
+          - /etc/pki/ca-trust/source/anchors
+    - name: Run OpenSSL Command in Terminal
+      ansible.builtin.command:
+          cmd: "{{item}}"
+      loop:
+          - openssl rehash /etc/openldap/cacerts
+          - update-ca-trust
+    - name: Pause to configure your IdM Realm password if not already done.
+      ansible.builtin.pause:
+          prompt: "Visit https://identity.corp.redhat.com to configure password. Hit enter when complete."
+    - name: Create the IPA directory
+      ansible.builtin.file:
+          path: /etc/ipa
+          state: "directory"
+          mode: u=rwx,g=rx,o=rx
+    - name: Download IPA cert
+      ansible.builtin.uri:
+          creates: /etc/ipa/ca.crt
+          dest: /etc/ipa/ca.crt
+          url: https://password.corp.redhat.com/ipa.crt
+    - name: Install the Kerberos Configuration
+      ansible.builtin.uri:
+          creates: /etc/krb5.conf.d/redhat-idm.conf
+          dest: /etc/krb5.conf.d/redhat-idm.conf
+          url: https://gitlab.corp.redhat.com/it-iam/system-configs/raw/master/krb5/idm/linux-krb5.conf 
+    - name: Comment out includedir lines in config file
+      replace:
+          dest: /etc/krb5.conf.d/redhat-idm.conf
+          regexp: '^includedir'
+          replace: '#includedir'
+    - name: Create the Google Chrome directory
+      ansible.builtin.file:
+          path: /etc/opt/chrome/policies/managed
+          state: "directory"
+          mode: u=rwx,g=rx,o=rx
+    - name: Create Redhat.corp file and add text
+      ansible.builtin.copy:
+          content: | 
+            {
+              "AuthServerAllowlist": "*.redhat.com",
+              "DisableAuthNegotiateCnameLookup" : true
+            }
+          dest: /etc/opt/chrome/policies/managed/redhat-corp.json
+    
+
+
+    
